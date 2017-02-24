@@ -48,8 +48,10 @@ class WP_Post_Meta_Revisioning {
 	function _wp_filter_revision_ui_diff( $fields, $compare_from, $compare_to ) {
 		$post_type = get_post_type( wp_is_post_revision( $compare_from ) );
 		foreach ( $this->_wp_post_revision_meta_keys( $post_type ) as $meta_key => $meta_name ) {
-			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_from->ID, $meta_key, true ), $meta_key, $compare_from, 'from' ) : '';
-			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_to->ID,   $meta_key, true ), $meta_key, $compare_to, 'to' );
+			$meta_value_from = $this->_prepare_meta_values_for_diff( get_post_meta( $compare_from->ID, $meta_key ) );
+			$meta_value_to = $this->_prepare_meta_values_for_diff( get_post_meta( $compare_to->ID,   $meta_key ) );
+			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", $meta_value_from, $meta_key, $compare_from, 'from' ) : '';
+			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", $meta_value_to, $meta_key, $compare_to, 'to' );
 
 			$args = array( 'show_split_view' => true );
 			$args = apply_filters( 'revision_text_diff_options', $args, $meta_key, $compare_from, $compare_to );
@@ -78,6 +80,38 @@ class WP_Post_Meta_Revisioning {
 			}
 		}
 		return $fields;
+	}
+
+	/**
+	 * Prepares meta values for diff.
+	 * If multiple values available -> list all of them.
+	 *
+	 * @param array $values Values array from get_post_meta().
+	 * @return string
+	 */
+	public function _prepare_meta_values_for_diff( $values ) {
+		if ( is_array( $values ) ) {
+			if ( count( $values ) > 1 ) {
+				$item_count = 1;
+				$flattened_values = '';
+				foreach ( $values as $value ) {
+					// if single meta value is still an array
+					if ( is_array( $value ) ) {
+						foreach ( $value as $element_key => $element_value ) {
+							$flattened_values .= "[" . $element_key . " " . $item_count . "]:\n" . $element_value . "\n";
+						}
+					} else {
+						$flattened_values .= $value . "\n";
+					}
+					$flattened_values .= "----------\n";
+					$item_count++;
+				}
+				return $flattened_values;
+			} else if ( count( $values ) === 1 ) {
+				return reset( $values );
+			}
+		}
+		return '';
 	}
 
 	/**
@@ -174,7 +208,7 @@ class WP_Post_Meta_Revisioning {
 	 */
 	public function _wp_check_revisioned_meta_fields_have_changed( $post_has_changed, WP_Post $last_revision, WP_Post $post ) {
 		foreach ( array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post ) ) ) as $meta_key ) {
-			if ( get_post_meta( $post->ID, $meta_key, true ) != get_post_meta( $last_revision->ID, $meta_key, true ) ) {
+			if ( get_post_meta( $post->ID, $meta_key ) !== get_post_meta( $last_revision->ID, $meta_key ) ) {
 				$post_has_changed = true;
 				break;
 			}
@@ -192,13 +226,15 @@ class WP_Post_Meta_Revisioning {
 		$post_id  = $revision->post_parent;
 		// Save revisioned meta fields.
 		foreach ( array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post_id ) ) ) as $meta_key ) {
-			$meta_value = get_post_meta( $post_id, $meta_key, true );
+			$meta_values = get_post_meta( $post_id, $meta_key );
 
 			/*
 			 * Use the underlying add_metadata() function vs add_post_meta()
 			 * to ensure metadata is added to the revision post and not its parent.
 			 */
-			add_metadata( 'post', $revision_id, $meta_key, $meta_value );
+			foreach( $meta_values as $meta_value ) {
+				add_metadata( 'post', $revision_id, $meta_key, $meta_value );
+			}
 		}
 	}
 
