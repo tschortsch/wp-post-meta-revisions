@@ -32,9 +32,6 @@ class WP_Post_Meta_Revisioning {
 		// When revisioned post meta has changed, trigger a revision save.
 		add_filter( 'wp_save_post_revision_post_has_changed', array( $this, '_wp_check_revisioned_meta_fields_have_changed' ), 10, 3 );
 
-		// Add the revisioned meta to the JS data for the revisions interface.
-		add_filter( 'wp_prepare_revision_for_js', array( $this, '_wp_add_meta_to_prepare_revision_for_js' ), 10, 3 );
-
 		// Filter the diff ui returned for the revisions screen.
 		add_filter( 'wp_get_revision_ui_diff', array( $this, '_wp_filter_revision_ui_diff' ), 10, 3 );
 	}
@@ -80,23 +77,6 @@ class WP_Post_Meta_Revisioning {
 			}
 		}
 		return $fields;
-	}
-
-	/**
-	 * Add the revisioned meta fields to the revisions interface.
-	 *
-	 * Include filters to enable customization of the meta display.
-	 */
-	function _wp_add_meta_to_prepare_revision_for_js( $revisions_data, $revision, $post ) {
-		$revisions_data['revisionedMeta'] = array();
-		// Go thru revisioned meta fields, adding them to the display data.
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key => $meta_name ) {
-			$revisions_data['revisionedMeta'][] = array(
-				$meta_key => get_post_meta( $revisions_data['id'], $meta_key, true ),
-			);
-		}
-		print_r($revisions_data['revisionedMeta']);
-		return $revisions_data;
 	}
 
 	/**
