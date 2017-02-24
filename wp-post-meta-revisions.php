@@ -101,14 +101,24 @@ class WP_Post_Meta_Revisioning {
 							$flattened_values .= "[" . $element_key . " " . $item_count . "]:\n" . $element_value . "\n";
 						}
 					} else {
-						$flattened_values .= $value . "\n";
+						$flattened_values .= "[" . $item_count . "]:\n" . $value . "\n";
 					}
 					$flattened_values .= "----------\n";
 					$item_count++;
 				}
 				return $flattened_values;
 			} else if ( count( $values ) === 1 ) {
-				return reset( $values );
+				$value = reset( $values );
+				// if single meta value is still an array
+				if ( is_array( $value ) ) {
+					$flattened_values = '';
+					foreach ( $value as $element_key => $element_value ) {
+						$flattened_values .= "[" . $element_key . "]:\n" . $element_value . "\n";
+					}
+					return $flattened_values;
+				} else {
+					return $value;
+				}
 			}
 		}
 		return '';
