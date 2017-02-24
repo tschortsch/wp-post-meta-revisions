@@ -184,7 +184,7 @@ class WP_Post_Meta_Revisioning {
 	 * @access public
 	 * @since 4.5.0
 	 *
-	 * @param string post_type Type of current post.
+	 * @param string $post_type Type of current post.
 	 *
 	 * @return array An array of meta keys to be revisioned.
 	 */
@@ -228,6 +228,8 @@ class WP_Post_Meta_Revisioning {
 	 * Save the revisioned meta fields.
 	 *
 	 * @since 4.5.0
+	 *
+	 * @param int $revision_id Id of current revision.
 	 */
 	public function _wp_save_revisioned_meta_fields( $revision_id ) {
 		$revision = get_post( $revision_id );
@@ -247,6 +249,11 @@ class WP_Post_Meta_Revisioning {
 	}
 
 	/**
+	 * Restores meta fields of a revision.
+	 *
+	 * @param int $post_id Id of post which is restored.
+	 * @param int $revision_id Id of revision to restore.
+	 *
 	 * Restore the revisioned meta values for a post.
 	 *
 	 * @since 4.5.0
