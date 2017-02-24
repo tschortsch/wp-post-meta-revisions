@@ -46,7 +46,8 @@ class WP_Post_Meta_Revisioning {
 	 * @return array
 	 */
 	function _wp_filter_revision_ui_diff( $fields, $compare_from, $compare_to ) {
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key => $meta_name ) {
+		$post_type = get_post_type( wp_is_post_revision( $compare_from ) );
+		foreach ( $this->_wp_post_revision_meta_keys( $post_type ) as $meta_key => $meta_name ) {
 			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_from->ID, $meta_key, true ), $meta_key, $compare_from, 'from' ) : '';
 			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_to->ID,   $meta_key, true ), $meta_key, $compare_to, 'to' );
 
@@ -99,6 +100,8 @@ class WP_Post_Meta_Revisioning {
 	 * @param Post object $new_autosave The new post being autosaved.
 	 */
 	public function _wp_autosave_post_revisioned_meta_fields( $new_autosave ) {
+		$post_type = get_post_type( wp_is_post_revision( $new_autosave ) );
+
 		/**
 		 * The post data arrives as either $_POST['data']['wp_autosave'] or the $_POST
 		 * itself. This sets $posted_data to the correct variable.
@@ -109,7 +112,7 @@ class WP_Post_Meta_Revisioning {
 		 * the meta key is part of the posted data, the meta value is not blank and
 		 * the the meta value has changes from the last autosaved value.
 		 */
-		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys( $post_type ) ) as $meta_key ) {
 
 			if ( isset( $posted_data[ $meta_key ] )
 				&& get_post_meta( $new_autosave['ID'], $meta_key, true ) != wp_unslash( $posted_data[ $meta_key ] ) )
@@ -139,9 +142,15 @@ class WP_Post_Meta_Revisioning {
 	 * @access public
 	 * @since 4.5.0
 	 *
+	 * @param string post_type Type of current post.
+	 *
 	 * @return array An array of meta keys to be revisioned.
 	 */
-	public function _wp_post_revision_meta_keys() {
+	public function _wp_post_revision_meta_keys( $post_type = 'post' ) {
+		if ( empty( $post_type ) ) {
+			$post_type = 'post';
+		}
+
 		/**
 		 * Filter the list of post meta keys to be revisioned.
 		 *
@@ -149,16 +158,22 @@ class WP_Post_Meta_Revisioning {
 		 *
 		 * @param array $keys An array of default meta fields to be revisioned.
 		 */
-		return apply_filters( 'wp_post_revision_meta_keys', array() );
+		return apply_filters( 'wp_post_revision_meta_keys', array(), $post_type );
 	}
 
 	/**
+	 * *
 	 * Check whether revisioned post meta fields have changed.
 	 *
 	 * @since 4.5.0
+	 *
+	 * @param bool    $post_has_changed Has post changed.
+	 * @param WP_Post $last_revision Last revision of post.
+	 * @param WP_Post $post Current post.
+	 * @return bool
 	 */
 	public function _wp_check_revisioned_meta_fields_have_changed( $post_has_changed, WP_Post $last_revision, WP_Post $post ) {
-		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post ) ) ) as $meta_key ) {
 			if ( get_post_meta( $post->ID, $meta_key, true ) != get_post_meta( $last_revision->ID, $meta_key, true ) ) {
 				$post_has_changed = true;
 				break;
@@ -176,7 +191,7 @@ class WP_Post_Meta_Revisioning {
 		$revision = get_post( $revision_id );
 		$post_id  = $revision->post_parent;
 		// Save revisioned meta fields.
-		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post_id ) ) ) as $meta_key ) {
 			$meta_value = get_post_meta( $post_id, $meta_key, true );
 
 			/*
@@ -194,7 +209,7 @@ class WP_Post_Meta_Revisioning {
 	 */
 	public function _wp_restore_post_revision_meta( $post_id, $revision_id ) {
 		// Restore revisioned meta fields.
-		$metas_revisioned = array_keys( $this->_wp_post_revision_meta_keys() );
+		$metas_revisioned = array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post_id ) ) );
 		if ( isset( $metas_revisioned ) && 0 !== sizeof( $metas_revisioned ) ) {
 			foreach ( $metas_revisioned as $meta_key ) {
 				// Clear any existing metas
@@ -232,7 +247,7 @@ class WP_Post_Meta_Revisioning {
 		$post = get_post();
 		if ( empty( $post )
 			|| $post->ID != $object_id
-			|| ! in_array( $meta_key, array_keys( $this->_wp_post_revision_meta_keys() ) )
+			|| ! in_array( $meta_key, array_keys( $this->_wp_post_revision_meta_keys( get_post_type( $post ) ) ) )
 			|| 'revision' == $post->post_type )
 		{
 			return $value;
