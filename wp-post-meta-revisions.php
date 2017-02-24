@@ -48,14 +48,12 @@ class WP_Post_Meta_Revisioning {
 	function _wp_filter_revision_ui_diff( $fields, $compare_from, $compare_to ) {
 		$post_type = get_post_type( wp_is_post_revision( $compare_from ) );
 		foreach ( $this->_wp_post_revision_meta_keys( $post_type ) as $meta_key => $meta_name ) {
-			$meta_value_from = $this->_prepare_meta_values_for_diff( get_post_meta( $compare_from->ID, $meta_key ) );
-			$meta_value_to = $this->_prepare_meta_values_for_diff( get_post_meta( $compare_to->ID,   $meta_key ) );
-			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", $meta_value_from, $meta_key, $compare_from, 'from' ) : '';
-			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", $meta_value_to, $meta_key, $compare_to, 'to' );
+			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_from->ID, $meta_key ), $meta_key, $compare_from, 'from' ) : '';
+			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_to->ID,   $meta_key ), $meta_key, $compare_to, 'to' );
 
 			$args = array( 'show_split_view' => true );
 			$args = apply_filters( 'revision_text_diff_options', $args, $meta_key, $compare_from, $compare_to );
-			$diff = wp_text_diff( $meta_from, $meta_to, $args );
+			$diff = wp_text_diff( $this->_prepare_meta_values_for_diff( $meta_from ), $this->_prepare_meta_values_for_diff( $meta_to ), $args );
 			// Add this meta field if it has a diff.
 			if ( ! empty( $diff ) ) {
 				$new_field = array(
