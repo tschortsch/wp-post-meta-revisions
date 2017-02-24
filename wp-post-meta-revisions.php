@@ -49,40 +49,34 @@ class WP_Post_Meta_Revisioning {
 	 * @return array
 	 */
 	function _wp_filter_revision_ui_diff( $fields, $compare_from, $compare_to ) {
-		// Do we have revisioned meta fields?
-		$revisioned_meta_keys = $this->_wp_post_revision_meta_keys();
-		if ( ! empty( $revisioned_meta_keys ) ) {
-			// Only add the header once, if we have a non-empty meta field.
-			$meta_header_added = false;
-			// Check each meta comparison for non empty diffs.
-			foreach ( $revisioned_meta_keys as $meta_key ) {
-				$meta_from = get_post_meta( $compare_from->ID, $meta_key, true );
-				$meta_to   = get_post_meta( $compare_to->ID,   $meta_key, true );
-				$args      = array( 'show_split_view' => true );
-				$args      = apply_filters( 'revision_text_diff_options', $args, end( $fields ), $compare_from, $compare_to );
-				$diff      = wp_text_diff( $meta_from[0], $meta_to[0], $args );
-				// Add this meta field if it has a diff.
-				if ( ! empty( $diff ) ) {
-					$new_field = array(
-						'id'   => $meta_key,
-						'name' => $meta_key,
-						'diff' => $diff
-					);
-					/**
-					 * Filter revisioned meta fields used for the revisions UI.
-					 *
-					 * The dynamic portion of the hook name, `$meta_key`, refers to
-					 * the revisioned meta key.
-					 *
-					 * @since 4.6.0
-					 *
-					 * @param object $new_field     Object with id, name and diff for the UI.
-					 * @param WP_Post $compare_from The revision post to compare from.
-					 * @param WP_Post $compare_to   The revision post to compare to.
-					 */
-					$new_field = apply_filters( 'revisioned_meta_ui_field_{$meta_key}', $new_field, $compare_from, $compare_to );
-					$fields[ sizeof( $fields ) ] = $new_field;
-				}
+		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key => $meta_name ) {
+			$meta_from = $compare_from ? apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_from->ID, $meta_key, true ), $meta_key, $compare_from, 'from' ) : '';
+			$meta_to = apply_filters( "_wp_post_revision_field_{$meta_key}", get_post_meta( $compare_to->ID,   $meta_key, true ), $meta_key, $compare_to, 'to' );
+
+			$args = array( 'show_split_view' => true );
+			$args = apply_filters( 'revision_text_diff_options', $args, $meta_key, $compare_from, $compare_to );
+			$diff = wp_text_diff( $meta_from, $meta_to, $args );
+			// Add this meta field if it has a diff.
+			if ( ! empty( $diff ) ) {
+				$new_field = array(
+					'id'   => $meta_key,
+					'name' => $meta_name,
+					'diff' => $diff
+				);
+
+				/**
+				 * Filter revisioned meta fields used for the revisions UI.
+				 *
+				 * The dynamic portion of the hook name, `$meta_key`, refers to
+				 * the revisioned meta key.
+				 *
+				 * @since 4.6.0
+				 *
+				 * @param object $new_field     Object with id, name and diff for the UI.
+				 * @param WP_Post $compare_from The revision post to compare from.
+				 * @param WP_Post $compare_to   The revision post to compare to.
+				 */
+				$fields[] = apply_filters( "revisioned_meta_ui_field_{$meta_key}", $new_field, $compare_from, $compare_to );
 			}
 		}
 		return $fields;
@@ -96,7 +90,7 @@ class WP_Post_Meta_Revisioning {
 	function _wp_add_meta_to_prepare_revision_for_js( $revisions_data, $revision, $post ) {
 		$revisions_data['revisionedMeta'] = array();
 		// Go thru revisioned meta fields, adding them to the display data.
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key ) {
+		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key => $meta_name ) {
 			$revisions_data['revisionedMeta'][] = array(
 				$meta_key => get_post_meta( $revisions_data['id'], $meta_key, true ),
 			);
@@ -135,7 +129,7 @@ class WP_Post_Meta_Revisioning {
 		 * the meta key is part of the posted data, the meta value is not blank and
 		 * the the meta value has changes from the last autosaved value.
 		 */
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
 
 			if ( isset( $posted_data[ $meta_key ] )
 				&& get_post_meta( $new_autosave['ID'], $meta_key, true ) != wp_unslash( $posted_data[ $meta_key ] ) )
@@ -184,7 +178,7 @@ class WP_Post_Meta_Revisioning {
 	 * @since 4.5.0
 	 */
 	public function _wp_check_revisioned_meta_fields_have_changed( $post_has_changed, WP_Post $last_revision, WP_Post $post ) {
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
 			if ( get_post_meta( $post->ID, $meta_key, true ) != get_post_meta( $last_revision->ID, $meta_key, true ) ) {
 				$post_has_changed = true;
 				break;
@@ -202,7 +196,7 @@ class WP_Post_Meta_Revisioning {
 		$revision = get_post( $revision_id );
 		$post_id  = $revision->post_parent;
 		// Save revisioned meta fields.
-		foreach ( $this->_wp_post_revision_meta_keys() as $meta_key ) {
+		foreach ( array_keys( $this->_wp_post_revision_meta_keys() ) as $meta_key ) {
 			$meta_value = get_post_meta( $post_id, $meta_key, true );
 
 			/*
@@ -220,7 +214,7 @@ class WP_Post_Meta_Revisioning {
 	 */
 	public function _wp_restore_post_revision_meta( $post_id, $revision_id ) {
 		// Restore revisioned meta fields.
-		$metas_revisioned =  $this->_wp_post_revision_meta_keys();
+		$metas_revisioned = array_keys( $this->_wp_post_revision_meta_keys() );
 		if ( isset( $metas_revisioned ) && 0 !== sizeof( $metas_revisioned ) ) {
 			foreach ( $metas_revisioned as $meta_key ) {
 				// Clear any existing metas
@@ -258,7 +252,7 @@ class WP_Post_Meta_Revisioning {
 		$post = get_post();
 		if ( empty( $post )
 			|| $post->ID != $object_id
-			|| ! in_array( $meta_key, $this->_wp_post_revision_meta_keys() )
+			|| ! in_array( $meta_key, array_keys( $this->_wp_post_revision_meta_keys() ) )
 			|| 'revision' == $post->post_type )
 		{
 			return $value;
